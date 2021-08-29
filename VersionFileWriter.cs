@@ -87,7 +87,7 @@ namespace VersionWriter
         /// <summary>
         /// Whether or not non-archived files of archived files will also be copied to copied files directory.
         /// </summary>
-        public bool CopyNonArchivedFiles { get; set; }
+        public bool CopyArchivedOriginalFiles { get; set; }
 
         private INIFile config;
 
@@ -329,7 +329,7 @@ namespace VersionWriter
                 {
                     string filename = Path.Combine(BasePath, file.Filename);
 
-                    if (CopyNonArchivedFiles || !file.Archived)
+                    if (CopyArchivedOriginalFiles || !file.Archived)
                     {
                         string copyFilename = Path.Combine(directory, file.Filename);
                         Directory.CreateDirectory(Path.GetDirectoryName(copyFilename));
@@ -501,9 +501,9 @@ namespace VersionWriter
 
             if (EnableExtendedUpdaterFeatures)
             {
-                CopyNonArchivedFiles = config.GetKeyAsBool("Options", "CopyNonArchivedFiles", false);
+                CopyArchivedOriginalFiles = config.GetKeyAsBool("Options", "CopyArchivedOriginalFiles", false);
 
-                if (CopyNonArchivedFiles)
+                if (CopyArchivedOriginalFiles)
                     Logger.Info("Option enabled: CopyArchivedOriginalFiles - Original versions of archived files will also be copied to copied files directory.", ConsoleColor.Green);
             }
 
