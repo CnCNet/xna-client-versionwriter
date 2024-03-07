@@ -566,6 +566,7 @@ namespace VersionWriter
             success = true;
             string[] paths = config.GetKeys("Include");
             string[] excludedFiles = config.GetKeys("ExcludeFiles");
+            string[] excludedDirectories = config.GetKeys("ExcludeDirectories");
             string[] archiveFiles = config.GetKeys("ArchiveFiles");
 
             if (paths == null)
@@ -587,7 +588,7 @@ namespace VersionWriter
 
                     foreach (string filename in filenames)
                     {
-                        var includedFile = GetFileFromConfig(filename.Replace(BasePath, ""), excludedFiles, archiveFiles, out bool successB);
+                        var includedFile = GetFileFromConfig(filename.Replace(BasePath, ""), excludedFiles, excludedDirectories, archiveFiles, out bool successB);
 
                         if (!successB)
                         {
@@ -603,7 +604,7 @@ namespace VersionWriter
                 }
                 else
                 {
-                    var includedFile = GetFileFromConfig(path, excludedFiles, archiveFiles, out bool successB);
+                    var includedFile = GetFileFromConfig(path, excludedFiles, excludedDirectories, archiveFiles, out bool successB);
 
                     if (!successB)
                     {
@@ -626,10 +627,11 @@ namespace VersionWriter
         /// </summary>
         /// <param name="filename">Filename of files.</param>
         /// <param name="excludedFiles">List of excluded files.</param>
+        /// <param name="excludedFiles">List of excluded directories.</param>
         /// <param name="archiveFiles">List of files to be archived.</param>
         /// <param name="success">Set to true if successful, otherwise false.</param>
         /// <returns>The file, or null if it is excluded.</returns>
-        private FileItem GetFileFromConfig(string filename, IEnumerable<string> excludedFiles, IEnumerable<string> archiveFiles, out bool success)
+        private FileItem GetFileFromConfig(string filename, IEnumerable<string> excludedFiles, IEnumerable<string> excludedDirectories, IEnumerable<string> archiveFiles, out bool success)
         {
             success = true;
             string path = Path.Combine(BasePath, filename);
@@ -640,7 +642,12 @@ namespace VersionWriter
                 success = false;
                 return null;
             }
-            if (excludedFiles != null && excludedFiles.Contains(filename))
+            else if (excludedDirectories != null && IsDirectoryExcluded(filename, excludedDirectories))
+            {
+                Logger.Warn("Included file '" + filename + "' is in an excluded directory. Skipping.");
+                return null;
+            }
+            else if (excludedFiles != null && excludedFiles.Contains(filename))
             {
                 Logger.Warn("Included file '" + filename + "' is on exclude list. Skipping.");
                 return null;
@@ -876,6 +883,25 @@ namespace VersionWriter
 
             md5.Dispose();
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Checks if filename is in an excluded directory.
+        /// </summary>
+        /// <param name="filename">Filename.</param>
+        /// <param name="excludedDirectories">List of excluded directories.</param>
+        /// <returns>True if filename is in excluded directory, otherwise false.</returns>
+        private bool IsDirectoryExcluded(string filename, IEnumerable<string> excludedDirectories)
+        {
+            foreach (string directory in excludedDirectories)
+            {
+                if (filename.StartsWith(directory))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
