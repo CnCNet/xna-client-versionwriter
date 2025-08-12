@@ -356,6 +356,15 @@ namespace VersionWriter
                         string copyFilename = Path.Combine(directory, file.Filename);
                         Directory.CreateDirectory(Path.GetDirectoryName(copyFilename));
                         File.Copy(filename, copyFilename, true);
+
+                        try
+                        {
+                            File.SetAttributes(copyFilename, File.GetAttributes(copyFilename) & ~FileAttributes.ReadOnly);
+                        }
+                        catch (Exception)
+                        {
+                        }
+
                         Logger.Info((isCustomComponents ? "Custom component: " : "") + file.Filename, ConsoleColor.Magenta);
                     }
 
