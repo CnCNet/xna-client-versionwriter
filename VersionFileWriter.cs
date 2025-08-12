@@ -611,56 +611,61 @@ namespace VersionWriter
 
             foreach (string path in paths)
             {
-                string fullPath = Path.Combine(BasePath + path);
-                DirectoryInfo dirInfo = new DirectoryInfo(Path.Combine(fullPath));
+                ProcessPath(path, files, excludedFiles, excludedDirectories, archiveFiles, out bool successOnPath);
 
-                if (dirInfo.Exists)
+                if (!successOnPath)
                 {
-                    Logger.Info("Included path '" + path + "' is a directory. Including all files in it.", ConsoleColor.Green);
-                    SearchOption opt = SearchOption.TopDirectoryOnly;
+                    success = false;
+                    return files;
+                }
+            }
 
-                    if (RecursiveDirectorySearch)
-                        opt = SearchOption.AllDirectories;
+            return files;
+        }
 
-                    FileInfo[] fileInfos = dirInfo.GetFiles("*.*", opt);
+        private void ProcessPath(string path, List<FileItem> files, string[] excludedFiles, string[] excludedDirectories, string[] archiveFiles, out bool success)
+        {
+            success = true;
+            string fullPath = Path.Combine(BasePath + path);
+            DirectoryInfo dirInfo = new DirectoryInfo(Path.Combine(fullPath));
 
-                    foreach (var file in fileInfos)
+            if (dirInfo.Exists)
+            {
+                if (ExcludeHiddenAndSystemFiles)
+                {
+                    var attributes = dirInfo.Attributes;
+
+                    if (attributes.HasFlag(FileAttributes.Hidden) || attributes.HasFlag(FileAttributes.System))
                     {
-                        string filename = file.FullName.Replace(BasePath, "");
-
-                        if (ExcludeHiddenAndSystemFiles)
-                        {
-                            var attributes = file.Attributes;
-
-                            if (attributes.HasFlag(FileAttributes.Hidden) || attributes.HasFlag(FileAttributes.System))
-                            {
-                                Logger.Warn("Included file '" + filename + "' is hidden or a system file. Skipping.");
-                                continue;
-                            }
-                        }
-
-                        var includedFile = GetFileFromConfig(filename, excludedFiles, excludedDirectories, archiveFiles, out bool successB);
-
-                        if (!successB)
-                        {
-                            success = false;
-                            return files;
-                        }
-
-                        if (includedFile == null)
-                            continue;
-                        else
-                            files.Add(includedFile);
+                        Logger.Warn("Included directory '" + path + "' is hidden or a system directory. Skipping.");
+                        return;
                     }
                 }
-                else
-                {
-                    var includedFile = GetFileFromConfig(path, excludedFiles, excludedDirectories, archiveFiles, out bool successB);
+                
+                Logger.Info("Included path '" + path + "' is a directory. Including all files in it.", ConsoleColor.Green);
+                FileInfo[] fileInfos = dirInfo.GetFiles("*.*", SearchOption.TopDirectoryOnly);
 
-                    if (!successB)
+                foreach (var file in fileInfos)
+                {
+                    string filename = file.FullName.Replace(BasePath, "");
+
+                    if (ExcludeHiddenAndSystemFiles)
+                    {
+                        var attributes = file.Attributes;
+
+                        if (attributes.HasFlag(FileAttributes.Hidden) || attributes.HasFlag(FileAttributes.System))
+                        {
+                            Logger.Warn("Included file '" + filename + "' is hidden or a system file. Skipping.");
+                            continue;
+                        }
+                    }
+
+                    var includedFile = GetFileFromConfig(filename, excludedFiles, excludedDirectories, archiveFiles, out bool successOnFile);
+
+                    if (!successOnFile)
                     {
                         success = false;
-                        return files;
+                        return;
                     }
 
                     if (includedFile == null)
@@ -668,9 +673,38 @@ namespace VersionWriter
                     else
                         files.Add(includedFile);
                 }
-            }
 
-            return files;
+                if (RecursiveDirectorySearch)
+                {
+                    DirectoryInfo[] directoryInfos = dirInfo.GetDirectories("*.*", SearchOption.TopDirectoryOnly);
+
+                    foreach (var directory in directoryInfos)
+                    {
+                        ProcessPath(directory.FullName.Replace(BasePath, ""), files, excludedFiles, excludedDirectories, archiveFiles, out bool successOnDir);
+
+                        if (!successOnDir)
+                        {
+                            success = false;
+                            return;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                var includedFile = GetFileFromConfig(path, excludedFiles, excludedDirectories, archiveFiles, out bool successOnFile);
+
+                if (!successOnFile)
+                {
+                    success = false;
+                    return;
+                }
+
+                if (includedFile == null)
+                    return;
+                else
+                    files.Add(includedFile);
+            }
         }
 
         /// <summary>
