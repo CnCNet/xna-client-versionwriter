@@ -89,6 +89,11 @@ namespace VersionWriter
         /// </summary>
         public bool CopyArchivedOriginalFiles { get; set; }
 
+        /// <summary>
+        /// Whether or not system and hidden files are excluded unless explicitly included by filename.
+        /// </summary>
+        public bool ExcludeHiddenAndSystemFiles { get; set; }
+
         private INIFile config;
 
         private readonly List<FileItem> filesInclude = new List<FileItem>();
@@ -499,6 +504,11 @@ namespace VersionWriter
             if (IncludeOnlyChangedFiles)
                 Logger.Info("Option enabled: IncludeOnlyChangedFiles - Only include info for changed files.", ConsoleColor.Green);
 
+            ExcludeHiddenAndSystemFiles = config.GetKeyAsBool("Options", "ExcludeHiddenAndSystemFiles", true);
+
+            if (!ExcludeHiddenAndSystemFiles)
+                Logger.Info("NOTE: Exclusion of hidden and system files has been disabled in configuration file.", ConsoleColor.Yellow);
+
             if (EnableExtendedUpdaterFeatures)
             {
                 CopyArchivedOriginalFiles = config.GetKeyAsBool("Options", "CopyArchivedOriginalFiles", false);
@@ -575,8 +585,9 @@ namespace VersionWriter
             foreach (string path in paths)
             {
                 string fullPath = Path.Combine(BasePath + path);
+                DirectoryInfo dirInfo = new DirectoryInfo(Path.Combine(fullPath));
 
-                if (Directory.Exists(Path.Combine(fullPath)))
+                if (dirInfo.Exists)
                 {
                     Logger.Info("Included path '" + path + "' is a directory. Including all files in it.", ConsoleColor.Green);
                     SearchOption opt = SearchOption.TopDirectoryOnly;
@@ -584,11 +595,24 @@ namespace VersionWriter
                     if (RecursiveDirectorySearch)
                         opt = SearchOption.AllDirectories;
 
-                    string[] filenames = Directory.GetFiles(fullPath, "*.*", opt);
+                    FileInfo[] fileInfos = dirInfo.GetFiles("*.*", opt);
 
-                    foreach (string filename in filenames)
+                    foreach (var file in fileInfos)
                     {
-                        var includedFile = GetFileFromConfig(filename.Replace(BasePath, ""), excludedFiles, excludedDirectories, archiveFiles, out bool successB);
+                        string filename = file.FullName.Replace(BasePath, "");
+
+                        if (ExcludeHiddenAndSystemFiles)
+                        {
+                            var attributes = file.Attributes;
+
+                            if (attributes.HasFlag(FileAttributes.Hidden) || attributes.HasFlag(FileAttributes.System))
+                            {
+                                Logger.Warn("Included file '" + filename + "' is hidden or a system file. Skipping.");
+                                continue;
+                            }
+                        }
+
+                        var includedFile = GetFileFromConfig(filename, excludedFiles, excludedDirectories, archiveFiles, out bool successB);
 
                         if (!successB)
                         {
