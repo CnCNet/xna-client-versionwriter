@@ -85,6 +85,11 @@ namespace VersionWriter
         public bool IncludeOnlyChangedFiles { get; set; }
 
         /// <summary>
+        /// If set no files will be copied at all, only version file is generated.
+        /// </summary>
+        public bool NoCopyMode { get; set; }
+
+        /// <summary>
         /// Whether or not non-archived files of archived files will also be copied to copied files directory.
         /// </summary>
         public bool CopyArchivedOriginalFiles { get; set; }
@@ -188,21 +193,25 @@ namespace VersionWriter
             Logger.Info("Checking for updated custom components.");
 
             var customComponentsUpdated = GetUpdatedCustomComponents();
+            string directory = string.Empty;
 
             if (filesUpdated.Count > 0 || customComponentsUpdated.Count > 0)
             {
-                Logger.Info("Copying updated files to subdirectory " + CopyDirectory + ".");
+                if (!NoCopyMode)
+                {
+                    Logger.Info("Copying updated files to subdirectory " + CopyDirectory + ".");
 
-                string directory = Path.Combine(BasePath, CopyDirectory);
+                    directory = Path.Combine(BasePath, CopyDirectory);
 
-                if (!HandleOverwriting(directory, supressInputs))
-                    return false;
+                    if (!HandleOverwriting(directory, supressInputs))
+                        return false;
 
-                if (!CopyFiles(directory, new List<IFileItem>(filesUpdated)))
-                    return false;
+                    if (!CopyFiles(directory, new List<IFileItem>(filesUpdated)))
+                        return false;
 
-                if (!CopyFiles(directory, new List<IFileItem>(customComponentsUpdated), true))
-                    return false;
+                    if (!CopyFiles(directory, new List<IFileItem>(customComponentsUpdated), true))
+                        return false;
+                }
 
                 Logger.Info("Writing version file.");
                 
@@ -220,7 +229,7 @@ namespace VersionWriter
                         return false;
                 }
 
-                if (Directory.Exists(directory))
+                if (!NoCopyMode && Directory.Exists(directory))
                     File.Copy(Path.Combine(BasePath, "version"), Path.Combine(directory, "version"));
 
                 Logger.Info("Finished generating new version file.");
@@ -261,14 +270,14 @@ namespace VersionWriter
             version.AddSection("FileVersions");
             version.AddSection("AddOns");
 
-            if (EnableExtendedUpdaterFeatures)
+            if (!NoCopyMode && EnableExtendedUpdaterFeatures)
                 version.AddSection("ArchivedFiles");
 
             foreach (FileItem file in files)
             {
                 version.SetKey("FileVersions", file.Filename, file.ID + "," + file.Size);
 
-                if (EnableExtendedUpdaterFeatures && file.Archived)
+                if (!NoCopyMode && EnableExtendedUpdaterFeatures && file.Archived)
                 {
                     GetArchiveIDAndSize(versionOld.GetKey("ArchivedFiles", file.Filename, ""), out string archiveID, out int archiveSize);
 
@@ -287,7 +296,7 @@ namespace VersionWriter
                     {
                         version.SetKey("FileVersions", file.Filename, file.ID + "," + file.Size);
 
-                        if (EnableExtendedUpdaterFeatures && file.Archived)
+                        if (!NoCopyMode && EnableExtendedUpdaterFeatures && file.Archived)
                             version.SetKey("ArchivedFiles", file.Filename, file.ArchiveID + "," + file.ArchiveSize);
                     }
                 }
@@ -297,7 +306,7 @@ namespace VersionWriter
             {
                 version.SetKey("AddOns", component.ComponentID, component.ID + "," + component.Size);
 
-                if (EnableExtendedUpdaterFeatures && component.Archived)
+                if (!NoCopyMode && EnableExtendedUpdaterFeatures && component.Archived)
                 {
                     GetArchiveIDAndSize(versionOld.GetKey("ArchivedFiles", component.Filename, ""), out string archiveID, out int archiveSize);
 
@@ -509,7 +518,12 @@ namespace VersionWriter
             if (!ExcludeHiddenAndSystemFiles)
                 Logger.Info("NOTE: Exclusion of hidden and system files has been disabled in configuration file.", ConsoleColor.Yellow);
 
-            if (EnableExtendedUpdaterFeatures)
+            NoCopyMode = config.GetKeyAsBool("Options", "NoCopyMode", false);
+
+            if (NoCopyMode)
+                Logger.Info("Option enabled: NoCopyMode - No files will be copied, archived files are also disabled.", ConsoleColor.Green);
+
+            if (!NoCopyMode && EnableExtendedUpdaterFeatures)
             {
                 CopyArchivedOriginalFiles = config.GetKeyAsBool("Options", "CopyArchivedOriginalFiles", false);
 
