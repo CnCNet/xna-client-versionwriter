@@ -85,9 +85,14 @@ namespace VersionWriter
         public bool IncludeOnlyChangedFiles { get; set; }
 
         /// <summary>
-        /// If set no files will be copied at all, only version file is generated.
+        /// If set to true no files will be copied at all, only version file is generated. This will also disable use of archived files.
         /// </summary>
         public bool NoCopyMode { get; set; }
+
+        /// <summary>
+        /// If set to true, version name is parsed as <see cref="https://learn.microsoft.com/en-us/dotnet/standard/base-types/custom-date-and-time-format-strings">timestamp/datetime string</see> with current timestamp applied on it.
+        /// </summary>
+        public bool ApplyTimestampOnVersion { get; set; }
 
         /// <summary>
         /// Whether or not non-archived files of archived files will also be copied to copied files directory.
@@ -256,7 +261,10 @@ namespace VersionWriter
             File.Delete(path);
             INIFile version = new INIFile(path);
 
-            version.SetKey("DTA", "Version", Version);
+            if (!ApplyTimestampOnVersion)
+                version.SetKey("DTA", "Version", Version);
+            else
+                version.SetKey("DTA", "Version", DateTime.Now.ToString(Version));
 
             if (EnableExtendedUpdaterFeatures)
             {
@@ -522,6 +530,11 @@ namespace VersionWriter
 
             if (NoCopyMode)
                 Logger.Info("Option enabled: NoCopyMode - No files will be copied, archived files are also disabled.", ConsoleColor.Green);
+
+            ApplyTimestampOnVersion = config.GetKeyAsBool("Options", "ApplyTimestampOnVersion", false);
+
+            if (ApplyTimestampOnVersion)
+                Logger.Info("Option enabled: ApplyTimestampOnVersion - Version name is treated as standard .NET date and time format string.", ConsoleColor.Green);
 
             if (!NoCopyMode && EnableExtendedUpdaterFeatures)
             {
