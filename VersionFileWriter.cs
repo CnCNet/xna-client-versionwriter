@@ -289,7 +289,7 @@ namespace VersionWriter
                 {
                     GetArchiveIDAndSize(versionOld.GetKey("ArchivedFiles", file.Filename, ""), out string archiveID, out int archiveSize);
 
-                    if ((string.IsNullOrEmpty(file.ArchiveID) || file.ArchiveSize < 1) && !string.IsNullOrEmpty(archiveID) && archiveSize > -1)
+                    if (!IsValidArchiveInfo(file.ArchiveID, file.ArchiveSize) && IsValidArchiveInfo(archiveID, archiveSize))
                         version.SetKey("ArchivedFiles", file.Filename, archiveID + "," + archiveSize);
                     else
                         version.SetKey("ArchivedFiles", file.Filename, file.ArchiveID == null ? "0" : file.ArchiveID + "," + file.ArchiveSize);
@@ -318,7 +318,7 @@ namespace VersionWriter
                 {
                     GetArchiveIDAndSize(versionOld.GetKey("ArchivedFiles", component.Filename, ""), out string archiveID, out int archiveSize);
 
-                    if ((string.IsNullOrEmpty(component.ArchiveID) || component.ArchiveSize < 1) && !string.IsNullOrEmpty(archiveID) && archiveSize > -1)
+                    if (!IsValidArchiveInfo(component.ArchiveID, component.ArchiveSize) && IsValidArchiveInfo(archiveID, archiveSize))
                         version.SetKey("ArchivedFiles", component.Filename, archiveID + "," + archiveSize);
                     else
                         version.SetKey("ArchivedFiles", component.Filename, component.ArchiveID == null ? "0" : component.ArchiveID + "," + component.ArchiveSize);
@@ -785,8 +785,8 @@ namespace VersionWriter
                     Filename = kvp.Key
                 };
 
-                GetArchiveIDAndSize(config.GetKey("ArchivedFiles", file.Filename, ""), out string archiveID, out int archiveSize);
-                file.Archived = archiveSize > -1 || !string.IsNullOrEmpty(archiveID);
+                GetArchiveIDAndSize(versionFile.GetKey("ArchivedFiles", file.Filename, ""), out string archiveID, out int archiveSize);
+                file.Archived = IsValidArchiveInfo(archiveID, archiveSize);
 
                 if (file.Archived)
                 {
@@ -859,7 +859,7 @@ namespace VersionWriter
         private List<CustomComponentItem> GetCustomComponentsFromVersionFile(INIFile versionFile)
         {
             List<CustomComponentItem> components = new List<CustomComponentItem>();
-            if (config.SectionExists("AddOns"))
+            if (versionFile.SectionExists("AddOns"))
             {
                 foreach (KeyValuePair<string, string> kvp in versionFile.GetKeyValuePairs("AddOns"))
                 {
@@ -878,9 +878,10 @@ namespace VersionWriter
                     else
                         continue;
 
-                    GetArchiveIDAndSize(config.GetKey("ArchivedFiles", add.Filename, ""), out string archiveID, out int archiveSize);
+                    GetArchiveIDAndSize(versionFile.GetKey("ArchivedFiles", add.Filename, ""), out string archiveID, out int archiveSize);
 
-                    add.Archived = archiveSize > -1 || !string.IsNullOrEmpty(archiveID);
+                    add.Archived = IsValidArchiveInfo(archiveID, archiveSize);
+
                     if (add.Archived)
                     {
                         add.ArchiveID = archiveID;
@@ -946,6 +947,17 @@ namespace VersionWriter
 
             if (int.TryParse(archSize, out int archSizeResult))
                 archiveSize = archSizeResult;
+        }
+
+        /// <summary>
+        /// Gets whether or not given archive info is valid.
+        /// </summary>
+        /// <param name="archiveID">Archive ID string.</param>
+        /// <param name="archiveSize">Archive size in kilobytes.</param>
+        /// <returns>True if valid, otherwise false.</returns>
+        private bool IsValidArchiveInfo(string archiveID, int archiveSize)
+        {
+            return !string.IsNullOrEmpty(archiveID) && archiveSize > -1;
         }
 
         /// <summary>
