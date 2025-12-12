@@ -108,7 +108,6 @@ namespace VersionWriter
 
         private readonly List<FileItem> filesInclude = new List<FileItem>();
         private readonly List<CustomComponentItem> customComponents = new List<CustomComponentItem>();
-        private List<FileItem> filesPrevious = new List<FileItem>();
 
         private const string ARCHIVE_EXTENSION = ".lzma";
 
@@ -193,7 +192,8 @@ namespace VersionWriter
 
             Logger.Info("Checking for updated files.");
 
-            var filesUpdated = GetUpdatedFiles();
+            var filesUpdated = GetUpdatedFiles(IncludeOnlyChangedFiles ? "version_base" : "version");
+            var previousFiles = IncludeOnlyChangedFiles ? GetFilesFromVersionFile(new INIFile(Path.Combine(BasePath, "version"))) : null;
 
             Logger.Info("Checking for updated custom components.");
 
@@ -222,20 +222,7 @@ namespace VersionWriter
                 
                 if (IncludeOnlyChangedFiles)
                 {
-                    bool skipWritingOldInfo = false;
-
-                    try
-                    {
-                        if (!File.Exists(Path.Combine(BasePath, "version")) && File.Exists(Path.Combine(BasePath, "version_base")))
-                            skipWritingOldInfo = true;
-                    }
-                    catch (Exception e)
-                    {
-                        Logger.Error("Error generating version file: " + e.Message);
-                        return false;
-                    }
-
-                    if (!WriteVersionFile("version", filesUpdated, filesPrevious, skipWritingOldInfo))
+                    if (!WriteVersionFile("version", filesUpdated, previousFiles))
                         return false;
 
                     if (!WriteVersionFile("version_base", filesInclude))
@@ -266,9 +253,8 @@ namespace VersionWriter
         /// <param name="filename">Filename of version file.</param>
         /// <param name="files">List of files to include in version file.</param>
         /// <param name="previousFiles">List of files from previous version file.</param>
-        /// <param name="skipWritingOldInfo">If set to true skip writing old files to FileVersions.</param>
         /// <returns>True if successful, otherwise false.</returns>
-        private bool WriteVersionFile(string filename, List<FileItem> files, List<FileItem> previousFiles = null, bool skipWritingOldInfo = false)
+        private bool WriteVersionFile(string filename, List<FileItem> files, List<FileItem> previousFiles = null)
         {
             string path = Path.Combine(BasePath, filename);
             INIFile versionOld = new INIFile(path);
@@ -316,8 +302,7 @@ namespace VersionWriter
                 {
                     if (files.Find(x => x.Filename == file.Filename) == null && filesInclude.Find(x => x.Filename == file.Filename) != null)
                     {
-                        if (!skipWritingOldInfo)
-                            version.SetKey("FileVersions", file.Filename, file.ID + "," + file.Size);
+                        version.SetKey("FileVersions", file.Filename, file.ID + "," + file.Size);
 
                         if (!NoCopyMode && EnableExtendedUpdaterFeatures && file.Archived)
                             version.SetKey("ArchivedFiles", file.Filename, file.ArchiveID + "," + file.ArchiveSize);
@@ -472,16 +457,15 @@ namespace VersionWriter
         /// Gets list of changed files based on options.
         /// </summary>
         /// <returns>List of changed files.</returns>
-        private List<FileItem> GetUpdatedFiles()
+        private List<FileItem> GetUpdatedFiles(string versionFilename)
         {
             List<FileItem> files = filesInclude;
-            string versionFilename = IncludeOnlyChangedFiles ? "version_base" : "version";
             string path = Path.Combine(BasePath, versionFilename);
 
             if (File.Exists(path))
             {
                 INIFile versionFile = new INIFile(path);
-                filesPrevious = GetFilesFromVersionFile(versionFile);
+                var filesPrevious = GetFilesFromVersionFile(versionFile);
                 files = GetChangedFiles(filesInclude, filesPrevious);
             }
             else
