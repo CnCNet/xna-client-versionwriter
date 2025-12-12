@@ -222,7 +222,20 @@ namespace VersionWriter
                 
                 if (IncludeOnlyChangedFiles)
                 {
-                    if (!WriteVersionFile("version", filesUpdated, filesPrevious))
+                    bool skipWritingOldInfo = false;
+
+                    try
+                    {
+                        if (!File.Exists(Path.Combine(BasePath, "version")) && File.Exists(Path.Combine(BasePath, "version_base")))
+                            skipWritingOldInfo = true;
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Error("Error generating version file: " + e.Message);
+                        return false;
+                    }
+
+                    if (!WriteVersionFile("version", filesUpdated, filesPrevious, skipWritingOldInfo))
                         return false;
 
                     if (!WriteVersionFile("version_base", filesInclude))
@@ -253,8 +266,9 @@ namespace VersionWriter
         /// <param name="filename">Filename of version file.</param>
         /// <param name="files">List of files to include in version file.</param>
         /// <param name="previousFiles">List of files from previous version file.</param>
+        /// <param name="skipWritingOldInfo">If set to true skip writing old files to FileVersions.</param>
         /// <returns>True if successful, otherwise false.</returns>
-        private bool WriteVersionFile(string filename, List<FileItem> files, List<FileItem> previousFiles = null)
+        private bool WriteVersionFile(string filename, List<FileItem> files, List<FileItem> previousFiles = null, bool skipWritingOldInfo = false)
         {
             string path = Path.Combine(BasePath, filename);
             INIFile versionOld = new INIFile(path);
@@ -302,7 +316,8 @@ namespace VersionWriter
                 {
                     if (files.Find(x => x.Filename == file.Filename) == null && filesInclude.Find(x => x.Filename == file.Filename) != null)
                     {
-                        version.SetKey("FileVersions", file.Filename, file.ID + "," + file.Size);
+                        if (!skipWritingOldInfo)
+                            version.SetKey("FileVersions", file.Filename, file.ID + "," + file.Size);
 
                         if (!NoCopyMode && EnableExtendedUpdaterFeatures && file.Archived)
                             version.SetKey("ArchivedFiles", file.Filename, file.ArchiveID + "," + file.ArchiveSize);
