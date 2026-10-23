@@ -905,9 +905,9 @@ namespace VersionWriter
             if (!config.SectionExists("ArchiveFiles"))
                 return false;
 
-            foreach (KeyValuePair<string, string> kvp in config.GetKeyValuePairs("ArchiveFiles"))
+            foreach (var kvp in config.GetKeyValuePairs("ArchiveFiles"))
             {
-                if (kvp.Value == filename)
+                if (kvp.Key == filename)
                     return true;
             }
 
